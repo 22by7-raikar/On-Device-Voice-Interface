@@ -14,7 +14,7 @@ jobs:
       matrix:
         preset: [release, asan]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
       - name: Configure
@@ -24,10 +24,26 @@ jobs:
       - name: Test
         run: ctest --preset ${{ matrix.preset }}
 
+  # Compile-only: hosted runners have no GPU, but this keeps the CUDA build and
+  # the ODVI_USE_GPU code path from silently rotting. sm_86 is the RTX 30 series.
+  cuda-build:
+    runs-on: ubuntu-24.04
+    container: nvidia/cuda:12.6.3-devel-ubuntu24.04
+    steps:
+      - name: Install build tools
+        run: apt-get update && apt-get install -y --no-install-recommends cmake git g++ ca-certificates
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - name: Configure
+        run: cmake --preset cuda -DCMAKE_CUDA_ARCHITECTURES=86 -DODVI_BUILD_TESTS=OFF
+      - name: Build
+        run: cmake --build --preset cuda --target odvi_listen -j "$(nproc)"
+
   format:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: |
           find src apps tests -name '*.h' -o -name '*.cpp' \
             | xargs clang-format --dry-run --Werror
@@ -35,11 +51,11 @@ jobs:
   docs:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y doxygen graphviz
       - name: Doxygen (warnings are errors)
         run: doxygen docs/Doxyfile
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: api-docs
           path: docs/api/html

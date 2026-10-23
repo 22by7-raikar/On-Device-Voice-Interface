@@ -1,4 +1,4 @@
-// WAV loading with downmix, and linear resampling.
+// WAV loading with downmix.
 
 #include <cstdint>
 #include <string>
@@ -54,35 +54,4 @@ TEST(LoadWav, MissingFileReportsThePath) {
     std::string error;
     EXPECT_FALSE(odvi::load_wav("/nonexistent/odvi.wav", audio, error));
     EXPECT_NE(error.find("/nonexistent/odvi.wav"), std::string::npos);
-}
-
-TEST(Resample, SameRateIsACopy) {
-    odvi::AudioBuffer in;
-    in.samples = {0.1f, -0.2f, 0.3f};
-    in.sample_rate = 16000;
-    const auto out = odvi::resample(in, 16000);
-    EXPECT_EQ(out.samples, in.samples);
-    EXPECT_EQ(out.sample_rate, 16000);
-}
-
-TEST(Resample, DownsamplingScalesTheLength) {
-    odvi::AudioBuffer in;
-    in.samples.assign(48000, 0.5f);
-    in.sample_rate = 48000;
-    const auto out = odvi::resample(in, 16000);
-    EXPECT_EQ(out.sample_rate, 16000);
-    EXPECT_EQ(out.samples.size(), 16000u);
-    EXPECT_FLOAT_EQ(out.samples.front(), 0.5f);
-}
-
-TEST(Resample, UpsamplingInterpolatesLinearly) {
-    odvi::AudioBuffer in;
-    in.samples = {0.0f, 1.0f, 0.0f};
-    in.sample_rate = 8000;
-    const auto out = odvi::resample(in, 16000);
-    ASSERT_EQ(out.samples.size(), 6u);
-    EXPECT_FLOAT_EQ(out.samples[0], 0.0f);
-    EXPECT_FLOAT_EQ(out.samples[1], 0.5f);
-    EXPECT_FLOAT_EQ(out.samples[2], 1.0f);
-    EXPECT_FLOAT_EQ(out.samples[3], 0.5f);
 }

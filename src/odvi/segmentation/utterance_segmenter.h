@@ -92,7 +92,8 @@ public:
     void push_frame(const float* frame, int n, bool is_speech);
 
     /// @brief End of stream: emit the active utterance if it has enough speech.
-    /// Idempotent. A trailing partial frame is dropped, not zero-padded.
+    /// Idempotent. A trailing partial frame is dropped, not zero-padded, and
+    /// later push() / push_frame() calls are ignored.
     void flush();
 
     /// @brief Take all completed utterances, oldest first.

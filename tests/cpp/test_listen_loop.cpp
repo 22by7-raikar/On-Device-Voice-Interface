@@ -1,6 +1,7 @@
-// ListenLoop: one ASR call per utterance, resampling, failure reporting, event JSON.
+// ListenLoop: one ASR call per utterance, ingress resampling, failure reporting, event JSON.
 
 #include <cmath>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -37,9 +38,9 @@ struct FakeAsr {
     }
 };
 
-odvi::ListenConfig config_at(int rate) {
+odvi::ListenConfig config_at(int input_rate) {
     odvi::ListenConfig cfg;
-    cfg.segmenter.sample_rate = rate;
+    cfg.input_rate = input_rate;
     return cfg;
 }
 
@@ -74,17 +75,42 @@ TEST(ListenLoop, EachUtteranceIsTranscribedExactlyOnce) {
     EXPECT_FALSE(loop.had_asr_error());
 }
 
-TEST(ListenLoop, ResamplesTo16kHzBeforeAsr) {
+TEST(ListenLoop, RejectsASegmenterNotAtTheInternalRate) {
+    FakeAsr asr;
+    odvi::ListenConfig cfg;
+    cfg.segmenter.sample_rate = 48000;
+    EXPECT_THROW(odvi::ListenLoop(cfg, asr.transcriber()), std::invalid_argument);
+}
+
+// 48 kHz input is resampled once at ingress, so the segmenter works in 16 kHz
+// frames and ASR receives 16 kHz audio.
+TEST(ListenLoop, ResamplesAtIngressSoAsrSees16kHz) {
     FakeAsr asr;
     odvi::ListenLoop loop(config_at(48000), asr.transcriber());
+    const std::vector<float> silence(960, 0.0f);
+    const auto tone = tone_frame(960, 48000);  // 20 ms at 48 kHz
+    push_frames(loop, silence, 10);
+    push_frames(loop, tone, 50);  // 1 s
+    push_frames(loop, silence, 40);
+    loop.flush();
+    ASSERT_EQ(asr.calls, 1);
+    // 1 s of speech plus pre-roll and trailing silence, at 16 kHz.
+    EXPECT_GT(asr.last_sample_count, 16000);
+    EXPECT_LT(asr.last_sample_count, 16000 * 2);
+    EXPECT_EQ(asr.last_sample_count % 320, 0);  // whole 20 ms frames at 16 kHz
+}
+
+TEST(ListenLoop, TranscriberExceptionsBecomeErrorEvents) {
+    odvi::ListenLoop loop(config_at(16000), [](const float*, int) -> odvi::AsrResult {
+        throw std::runtime_error("CUDA out of memory");
+    });
     odvi::Utterance utterance;
-    utterance.samples.assign(48000, 0.1f);  // 1 s at 48 kHz
-    utterance.sample_rate = 48000;
-    utterance.id = 7;
+    utterance.samples.assign(8000, 0.1f);
+    utterance.sample_rate = 16000;
     const auto event = loop.process_utterance(std::move(utterance));
-    EXPECT_EQ(asr.last_sample_count, 16000);
-    EXPECT_EQ(event.duration_ms, 1000);
-    EXPECT_EQ(event.utterance_id, 7u);
+    EXPECT_FALSE(event.asr_ok);
+    EXPECT_EQ(event.asr_error, "transcriber threw: CUDA out of memory");
+    EXPECT_TRUE(loop.had_asr_error());
 }
 
 TEST(ListenLoop, AsrFailureIsReportedNotThrown) {

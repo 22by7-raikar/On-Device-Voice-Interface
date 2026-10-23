@@ -2,25 +2,45 @@
 
 #include <chrono>
 #include <cmath>
+#include <exception>
 #include <stdexcept>
+#include <string>
 #include <utility>
-
-#include "odvi/audio/audio_io.h"
 
 namespace odvi {
 namespace {
 
-constexpr int kAsrRate = 16000;  // whisper.cpp's only input rate
-
 int frames_to_ms(int frames, int frame_ms) {
     return frames * frame_ms;
+}
+
+const SegmenterConfig& checked_segmenter(const SegmenterConfig& cfg) {
+    if (cfg.sample_rate != kInternalSampleRate) {
+        throw std::invalid_argument("segmenter must run at the internal rate of " +
+                                    std::to_string(kInternalSampleRate) + " Hz");
+    }
+    return cfg;
+}
+
+AsrResult call_transcriber(const Transcriber& transcribe, const std::vector<float>& audio) {
+    if (audio.empty()) return AsrResult{"", 0.0, false, "empty utterance"};
+    try {
+        // Utterances are capped by SegmenterConfig::max_utterance_ms, so the
+        // sample count always fits in an int.
+        return transcribe(audio.data(), static_cast<int>(audio.size()));
+    } catch (const std::exception& e) {
+        return AsrResult{"", 0.0, false, std::string("transcriber threw: ") + e.what()};
+    } catch (...) {
+        return AsrResult{"", 0.0, false, "transcriber threw a non-standard exception"};
+    }
 }
 
 }  // namespace
 
 ListenLoop::ListenLoop(ListenConfig config, Transcriber transcribe)
     : config_(std::move(config)),
-      segmenter_(config_.segmenter),
+      resampler_(config_.input_rate, kInternalSampleRate),
+      segmenter_(checked_segmenter(config_.segmenter)),
       transcribe_(std::move(transcribe)) {
     if (!transcribe_) {
         throw std::invalid_argument("listen loop needs a transcriber");
@@ -28,12 +48,22 @@ ListenLoop::ListenLoop(ListenConfig config, Transcriber transcribe)
 }
 
 void ListenLoop::push(const float* samples, int sample_count) {
-    segmenter_.push(samples, sample_count);
-    drain_completed();
+    resampled_.clear();
+    resampler_.process(samples, sample_count, resampled_);
+    feed_segmenter(resampled_);
 }
 
 void ListenLoop::flush() {
+    resampled_.clear();
+    resampler_.flush(resampled_);
+    feed_segmenter(resampled_);
     segmenter_.flush();
+    drain_completed();
+}
+
+void ListenLoop::feed_segmenter(const std::vector<float>& samples) {
+    if (samples.empty()) return;
+    segmenter_.push(samples.data(), static_cast<int>(samples.size()));
     drain_completed();
 }
 
@@ -55,18 +85,13 @@ TranscriptEvent ListenLoop::process_utterance(Utterance utterance) {
     event.start_stream_frame = utterance.start_stream_frame;
     event.end_stream_frame = utterance.end_stream_frame;
 
-    AudioBuffer audio;
-    audio.samples = std::move(utterance.samples);
-    audio.sample_rate = utterance.sample_rate;
-    event.duration_ms = static_cast<int>(std::llround(audio.duration_sec() * 1000.0));
-    audio = resample(audio, kAsrRate);
+    if (utterance.sample_rate != kInternalSampleRate) {
+        throw std::invalid_argument("utterance must be at the internal sample rate");
+    }
+    event.duration_ms = static_cast<int>(
+        std::llround(1000.0 * static_cast<double>(utterance.samples.size()) / kInternalSampleRate));
 
-    // Utterances are capped by SegmenterConfig::max_utterance_ms, so the
-    // sample count always fits in an int.
-    const AsrResult asr =
-        audio.samples.empty()
-            ? AsrResult{"", 0.0, false, "empty utterance"}
-            : transcribe_(audio.samples.data(), static_cast<int>(audio.samples.size()));
+    const AsrResult asr = call_transcriber(transcribe_, utterance.samples);
     event.asr_ok = asr.ok;
     event.asr_ms = asr.inference_ms;
     if (asr.ok) {

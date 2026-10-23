@@ -1,8 +1,9 @@
-# odvi_core: audio I/O, segmentation, the listening loop and event encoding.
+# odvi_core: audio I/O and resampling, segmentation, the listening loop and event encoding.
 # Pure C++17 with no model runtime, so it is fully testable without weights.
 add_library(odvi_core STATIC
     odvi/audio/audio_io.cpp
     odvi/audio/raw_pcm_decoder.cpp
+    odvi/audio/resampler.cpp
     odvi/segmentation/vad.cpp
     odvi/segmentation/utterance_segmenter.cpp
     odvi/pipeline/transcript_event.cpp

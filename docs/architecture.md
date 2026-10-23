@@ -48,7 +48,7 @@ changing that contract.
 
 ```
 src/odvi/
-  audio/          AudioBuffer, WAV loading, resampling, RawPcmDecoder
+  audio/          AudioBuffer, WAV loading, RawPcmDecoder, Resampler
   segmentation/   energy/ZCR frame VAD, streaming utterance segmenter
   asr/            Transcriber interface (core) and AsrEngine (whisper.cpp, separate target)
   pipeline/       ListenLoop and TranscriptEvent
@@ -77,12 +77,28 @@ Everything downstream consumes **mono float PCM in [-1, 1]**.
   scaling. A trailing partial frame is a malformed stream: decoded frames are
   still delivered and the error is reported on the next call.
 - `load_wav()` decodes any dr_wav-supported WAV and downmixes by averaging.
-  `resample()` is linear interpolation with no anti-aliasing filter: adequate
-  to feed ASR, and replaced by a proper resampler when the front end lands.
+- `Resampler` converts between any two rates in [8, 192] kHz by a reduced
+  rational factor L/M (48 → 16 kHz is 1/3; 44.1 → 16 kHz is 160/441). One
+  Kaiser-windowed sinc prototype is designed at the virtual rate
+  L × input rate and stored as L phases of K taps:
+
+  | Property | Value |
+  |---|---|
+  | Passband | 0 to 85% of the lower Nyquist (0–6.8 kHz at 16 kHz out) |
+  | Stopband | ≥ 80 dB from the lower Nyquist up |
+  | Measured, 1 kHz tone vs ideal | error below −97 dB for 48→16, 44.1→16, 16→48 kHz |
+  | Measured alias rejection, 48→16 kHz | −87 dB at 8.5 kHz; below −110 dB from 10 kHz |
+  | Cost | K multiply-adds per output (K = 202 for 48→16 kHz) |
+  | Look-ahead | about 2.1 ms at 48 kHz |
+
+  Output is time-aligned with the input (the group delay is compensated), and
+  streaming in any block sizes is bit-identical to a one-shot conversion; both
+  are tested. Linear interpolation, used before, passed 8.5–23 kHz tones into
+  the 16 kHz output at full level ([D1](decisions.md)).
 
 ### Segmentation (`segmentation/`)
 
-`vad_frame_is_speech()` classifies a 20 ms frame as speech if its RMS reaches
+Segmentation runs at the internal rate of 16 kHz. `vad_frame_is_speech()` classifies a 20 ms frame as speech if its RMS reaches
 0.005 and its zero-crossing rate stays below 3,000/s. It is cheap and
 transparent, and it is the baseline the benchmark compares neural VADs
 against. `run_vad()` applies the same classifier offline to a whole buffer.
@@ -117,10 +133,11 @@ CPU if that fails; `backend_mode()` reports which backend is active.
 
 ![Listening pipeline](diagrams/listen_pipeline.svg)
 
-`ListenLoop` owns the segmenter and calls the injected `Transcriber` **exactly
-once per utterance**, on the whole utterance after resampling to 16 kHz. ASR
-failures are data, not exceptions: the event carries `asr_error` and the loop
-records that a failure happened.
+`ListenLoop` resamples the input stream once, at ingress, to 16 kHz, then owns
+the segmenter and calls the injected `Transcriber` **exactly once per
+utterance**, on the whole utterance. ASR failures are data, not exceptions: an
+error result or a thrown exception both become an event with `asr_error` set,
+the loop keeps running, and it records that a failure happened.
 
 **Event schema.** One JSON object per line, one line per utterance:
 
@@ -155,6 +172,7 @@ and moving ASR to a worker thread behind a bounded queue, is milestone M3.
 | Resource | Bound |
 |---|---|
 | Stream decoder | 3 bytes carry + one 512-frame block |
+| Resampler | L × K coefficients + K input samples of history (≈ 30k floats for 44.1 → 16 kHz) |
 | Segmenter | pre-roll + `max_utterance_ms` of audio (~0.5 MB at 16 kHz) |
 
 ## Error handling
@@ -165,14 +183,19 @@ and moving ASR to a worker thread behind a bounded queue, is milestone M3.
 - **Data errors** (malformed PCM tail, unreadable WAV) are reported with
   context. The listener still emits events for audio decoded before the error,
   then exits non-zero.
-- **ASR failures** are recorded in the event; the listener exits non-zero at
-  the end if any utterance failed.
+- **ASR failures**, returned or thrown, are recorded in the event; the
+  listener exits non-zero at the end if any utterance failed.
+- **Contract violations** (a frame of the wrong size, an utterance at the
+  wrong rate) throw in every build type; they are never only `assert`s.
 
 ## Design decisions
 
 **ASR exactly once per utterance, on the whole utterance.** Transcribing fixed
 windows cuts words at window edges and makes cost depend on window size
 instead of on what was said.
+
+The full decision log, with context and consequences, is in
+[decisions.md](decisions.md).
 
 **A core library without a model runtime.** Faster builds, model-free tests,
 and a clean seam for swapping the recogniser (a different Whisper size, a
@@ -187,5 +210,4 @@ latency benefit can be measured against this baseline.
 - The frame VAD is energy/ZCR based and weak in non-stationary noise; M1
   compares it with neural VADs.
 - No front end yet: the loop transcribes whatever the microphone delivers.
-- Linear resampling has no anti-aliasing filter.
 - Single-threaded; English by default (`--language auto` detects others).
