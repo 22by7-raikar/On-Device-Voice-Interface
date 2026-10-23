@@ -1,0 +1,21 @@
+%% odvi_listen: one push() of a PCM block, through to an event on stdout.
+sequenceDiagram
+    autonumber
+    participant In as stdin (S16LE)
+    participant Dec as RawPcmDecoder
+    participant LL as ListenLoop
+    participant Seg as StreamingUtteranceSegmenter
+    participant ASR as Transcriber (whisper.cpp)
+    participant Out as stdout (JSON Lines)
+
+    In->>Dec: bytes, any split
+    Dec->>LL: push(mono float block)
+    LL->>Seg: push(samples)
+    Note over Seg: 20 ms frames → VAD → IDLE / SPEECH / ENDING
+    Seg-->>LL: completed utterances (0..n)
+    loop each utterance
+        LL->>LL: resample to 16 kHz
+        LL->>ASR: transcribe(whole utterance), exactly once
+        ASR-->>LL: AsrResult (text or error, decode ms)
+        LL->>Out: TranscriptEvent as one JSON line
+    end

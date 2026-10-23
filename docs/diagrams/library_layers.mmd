@@ -1,0 +1,35 @@
+%% Build targets and allowed dependencies. Arrows point at what is depended on.
+flowchart TB
+    subgraph apps[apps/]
+        listen[odvi_listen]
+    end
+    subgraph tests_[tests/]
+        ut[odvi_tests<br/>GoogleTest]
+        lp[listen_protocol<br/>driver + Python check]
+    end
+    asr[odvi_asr<br/>asr/asr_engine]
+    subgraph core[odvi_core]
+        direction LR
+        pipe[pipeline] --> seg[segmentation]
+        pipe --> au[audio]
+        pipe --> rep[report]
+        pipe -. Transcriber interface .-> tr[asr/transcription.h]
+    end
+    whisper[[whisper.cpp]]
+    drwav[[dr_wav]]
+    gtest[[GoogleTest]]
+
+    listen --> asr
+    ut --> core
+    lp --> core
+    asr --> core
+    asr --> whisper
+    au --> drwav
+    ut --> gtest
+
+    classDef ext fill:#f4f4f5,stroke:#71717a,color:#18181b
+    classDef app fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef lib fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class whisper,drwav,gtest ext
+    class listen,ut,lp app
+    class asr,pipe,seg,au,rep,tr lib

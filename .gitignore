@@ -1,0 +1,26 @@
+# Build trees (CMake presets build into build/<preset>)
+build/
+docs/api/
+
+# Model weights and local data
+models/*
+!models/.gitkeep
+*.bin
+*.gguf
+*.onnx
+*.pt
+data/
+
+# Local run output
+results/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp

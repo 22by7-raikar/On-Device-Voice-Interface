@@ -1,0 +1,23 @@
+%% Target system. Green stages exist; dashed stages are planned, labelled by milestone.
+flowchart TB
+    subgraph hear["1 · Hear: clean the audio"]
+        direction LR
+        mic[/Mic array<br/>G14 or simulated/] --> bf[Beamforming + DOA<br/><i>M2</i>] --> dn[Denoising<br/><i>M2</i>] --> aec[Echo cancellation<br/><i>M5</i>]
+    end
+    subgraph understand["2 · Understand: decide what was asked"]
+        direction LR
+        seg[Utterance segmenter<br/>energy/ZCR VAD] --> asr[ASR<br/>whisper.cpp] --> llm[LLM tool call<br/><i>M4</i>] --> val[Validator<br/><i>M4</i>]
+    end
+    subgraph act["3 · Act and speak"]
+        direction LR
+        robot[Simulated robot<br/>moves, faces speaker<br/><i>M4</i>] ~~~ tts[TTS<br/><i>M5</i>] --> spk[/Speaker/] ~~~ barge[Barge-in<br/>stops TTS, LLM, motion<br/><i>M5</i>]
+    end
+    hear -- "clean mono audio + direction" --> understand
+    understand -- "validated tool calls + reply text" --> act
+
+    classDef ext fill:#f4f4f5,stroke:#71717a,color:#18181b
+    classDef built fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef planned fill:#ffffff,stroke:#71717a,color:#3f3f46,stroke-dasharray:4 3
+    class mic,spk ext
+    class seg,asr built
+    class bf,dn,aec,llm,val,robot,tts,barge planned
