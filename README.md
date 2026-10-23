@@ -28,7 +28,8 @@ Every stage exists because the robot needs it, not as a feature checklist:
 | Barge-in | "Stop" mid-sentence or mid-motion is a safety feature. |
 | Validated tool calls | An LLM must never send an out-of-range or stale motion command. |
 
-Design, contracts and trade-offs: [docs/architecture.md](docs/architecture.md).
+Design, contracts and trade-offs: [docs/architecture.md](docs/architecture.md);
+the reasoning behind them: [docs/decisions.md](docs/decisions.md).
 The API reference is generated with Doxygen.
 
 ## Roadmap
@@ -78,7 +79,7 @@ Reads raw S16LE PCM on stdin and writes JSON Lines on stdout.
 
 | Option | |
 |---|---|
-| `--rate <hz> --channels <1\|2>` | Required. Input format; any rate with whole 20 ms frames. |
+| `--rate <hz> --channels <1\|2>` | Required. Input format; 8–192 kHz, resampled to 16 kHz with an anti-aliased polyphase filter. |
 | `--model <path>` | Required. whisper.cpp GGML model. |
 | `--threads <n>` | ASR threads (default 4). |
 | `--language <code>` | Language hint, or `auto` (default `en`). |
@@ -99,14 +100,15 @@ Exit status: 0 on success, 2 for invalid arguments (before the model loads),
 | Format | `clang-format -i $(git ls-files 'src/*.h' 'src/*.cpp' 'apps/*.cpp' 'tests/*.cpp')` |
 
 Presets build with `-Wall -Wextra -Wpedantic -Wshadow -Werror`. CI runs the
-Release and sanitizer suites, clang-format and Doxygen with warnings as errors.
+Release and sanitizer suites, a CUDA compile (no GPU on the runners, so
+compile-only), clang-format, and Doxygen with warnings as errors.
 
 ```
 src/odvi/   audio · segmentation · asr · pipeline · report
 apps/       odvi_listen
 tests/      GoogleTest suite and the stdout protocol test
 scripts/    model download, live and replay listening
-docs/       architecture, diagrams, Doxyfile
+docs/       architecture, decision log, diagrams, Doxyfile
 ```
 
 ## Prior work

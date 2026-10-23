@@ -4,17 +4,19 @@ sequenceDiagram
     participant In as stdin (S16LE)
     participant Dec as RawPcmDecoder
     participant LL as ListenLoop
+    participant Rs as Resampler
     participant Seg as StreamingUtteranceSegmenter
     participant ASR as Transcriber (whisper.cpp)
     participant Out as stdout (JSON Lines)
 
     In->>Dec: bytes, any split
-    Dec->>LL: push(mono float block)
-    LL->>Seg: push(samples)
+    Dec->>LL: push(mono float block, input rate)
+    LL->>Rs: process(block)
+    Rs-->>LL: 16 kHz samples, anti-aliased
+    LL->>Seg: push(16 kHz samples)
     Note over Seg: 20 ms frames → VAD → IDLE / SPEECH / ENDING
     Seg-->>LL: completed utterances (0..n)
     loop each utterance
-        LL->>LL: resample to 16 kHz
         LL->>ASR: transcribe(whole utterance), exactly once
         ASR-->>LL: AsrResult (text or error, decode ms)
         LL->>Out: TranscriptEvent as one JSON line

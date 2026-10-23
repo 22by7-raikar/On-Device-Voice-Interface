@@ -4,6 +4,7 @@
 add_executable(odvi_tests
     cpp/test_audio_io.cpp
     cpp/test_raw_pcm_decoder.cpp
+    cpp/test_resampler.cpp
     cpp/test_vad.cpp
     cpp/test_utterance_segmenter.cpp
     cpp/test_listen_loop.cpp)

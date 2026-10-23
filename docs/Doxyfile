@@ -5,6 +5,7 @@ PROJECT_BRIEF          = "On-device voice interface for robots"
 OUTPUT_DIRECTORY       = docs/api
 INPUT                  = README.md \
                          docs/architecture.md \
+                         docs/decisions.md \
                          src/odvi
 FILE_PATTERNS          = *.h *.md
 RECURSIVE              = YES

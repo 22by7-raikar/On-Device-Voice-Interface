@@ -14,6 +14,7 @@
 
 #include "odvi/asr/asr_engine.h"
 #include "odvi/audio/raw_pcm_decoder.h"
+#include "odvi/audio/resampler.h"
 #include "odvi/pipeline/listen_loop.h"
 
 namespace {
@@ -77,11 +78,10 @@ Options parse_options(int argc, char** argv) {
             throw std::invalid_argument("unknown option: " + arg);
     }
 
-    if (o.rate <= 0 || o.rate > odvi::RawPcmDecoder::kMaxSampleRate) {
-        throw std::invalid_argument("--rate must be in [1, 384000]");
-    }
-    if ((o.rate * 20) % 1000 != 0) {
-        throw std::invalid_argument("--rate must give whole 20 ms frames");
+    if (o.rate < odvi::Resampler::kMinRate || o.rate > odvi::Resampler::kMaxRate) {
+        throw std::invalid_argument("--rate must be in [" +
+                                    std::to_string(odvi::Resampler::kMinRate) + ", " +
+                                    std::to_string(odvi::Resampler::kMaxRate) + "]");
     }
     if (o.channels != 1 && o.channels != 2) {
         throw std::invalid_argument("--channels must be 1 or 2");
@@ -114,7 +114,7 @@ int run(const Options& o) {
               << " cpu_fallback=" << (asr.used_cpu_fallback() ? "yes" : "no") << '\n';
 
     odvi::ListenConfig cfg;
-    cfg.segmenter.sample_rate = o.rate;
+    cfg.input_rate = o.rate;
     cfg.capture_device = o.capture_device;
     cfg.transport = o.transport;
     odvi::ListenLoop loop(cfg, asr.as_transcriber());

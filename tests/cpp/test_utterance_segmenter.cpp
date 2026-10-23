@@ -451,6 +451,10 @@ TEST(UtteranceSegmenter, InvalidConfigurations) {
     ASSERT_TRUE(make(bad));
 }
 
-// ---------------------------------------------------------------------------
-// main
-// ---------------------------------------------------------------------------
+// push_frame() must validate the frame size in every build type, not only
+// when assertions are enabled: a short frame would otherwise be read past its end.
+TEST(UtteranceSegmenter, PushFrameRejectsTheWrongFrameSize) {
+    StreamingUtteranceSegmenter seg(default_cfg());
+    const std::vector<float> short_frame(kFS - 1, 0.0f);
+    EXPECT_THROW(seg.push_frame(short_frame.data(), kFS - 1, true), std::invalid_argument);
+}

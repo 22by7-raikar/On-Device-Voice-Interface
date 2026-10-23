@@ -3,7 +3,6 @@
 #include "odvi/segmentation/utterance_segmenter.h"
 
 #include <algorithm>
-#include <cassert>
 #include <stdexcept>
 #include <string>
 
@@ -74,9 +73,11 @@ void StreamingUtteranceSegmenter::push(const float* samples, int n) {
 }
 
 void StreamingUtteranceSegmenter::push_frame(const float* frame, int n, bool is_speech) {
+    if (n != frame_samples_) {
+        throw std::invalid_argument("push_frame: expected " + std::to_string(frame_samples_) +
+                                    " samples, got " + std::to_string(n));
+    }
     if (flushed_ || frame == nullptr) return;
-    assert(n == frame_samples_ && "push_frame: n must equal frame_samples()");
-    (void)n;  // suppress unused-parameter warning in release builds
     process_frame(frame, is_speech);
     sync_buffered_telemetry();
 }

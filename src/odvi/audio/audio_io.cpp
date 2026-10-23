@@ -1,11 +1,10 @@
-// WAV loading (dr_wav) with channel downmix, and linear-interpolation resampling.
+// WAV loading (dr_wav) with channel downmix.
 
 #define DR_WAV_IMPLEMENTATION
 #include "dr_wav.h"
 
 #include "odvi/audio/audio_io.h"
 
-#include <algorithm>
 #include <cstdint>
 #include <cstring>
 
@@ -58,28 +57,6 @@ bool load_wav(const std::string& path, AudioBuffer& out, std::string& out_error)
     }
 
     return true;
-}
-
-AudioBuffer resample(const AudioBuffer& in, int target_rate) {
-    if (in.sample_rate == target_rate || in.samples.empty()) return in;
-
-    AudioBuffer out;
-    out.sample_rate = target_rate;
-    out.channels = 1;
-
-    const double ratio = static_cast<double>(in.sample_rate) / target_rate;
-    const size_t out_frames = static_cast<size_t>(in.samples.size() / ratio);
-    out.samples.resize(out_frames);
-
-    for (size_t i = 0; i < out_frames; ++i) {
-        const double pos = i * ratio;
-        const size_t idx0 = static_cast<size_t>(pos);
-        const size_t idx1 = std::min(idx0 + 1, in.samples.size() - 1);
-        const float frac = static_cast<float>(pos - idx0);
-        out.samples[i] = in.samples[idx0] * (1.0f - frac) + in.samples[idx1] * frac;
-    }
-
-    return out;
 }
 
 }  // namespace odvi

@@ -1,5 +1,5 @@
 /// @file
-/// @brief Mono float PCM buffers, WAV loading and sample-rate conversion.
+/// @brief Mono float PCM buffers and WAV loading.
 /// @ingroup audio
 
 #pragma once
@@ -12,9 +12,9 @@ namespace odvi {
 /// @defgroup audio Audio input
 /// @brief Getting audio into the runtime as mono float PCM.
 ///
-/// Two entry points: load_wav() for complete files (offline pipeline) and
-/// RawPcmDecoder for unbounded S16LE streams (streaming pipeline). Both produce
-/// mono `float` samples in [-1, 1]; everything downstream assumes that format.
+/// Two entry points: load_wav() for complete files and RawPcmDecoder for
+/// unbounded S16LE streams. Both produce mono `float` samples in [-1, 1].
+/// Resampler converts either to the 16 kHz the rest of the runtime uses.
 /// @{
 
 /// @brief A contiguous block of mono float32 PCM in [-1, 1].
@@ -34,23 +34,13 @@ struct AudioBuffer {
 ///
 /// Any integer or float WAV encoding supported by dr_wav is accepted.
 /// Multi-channel audio is downmixed by averaging channels; the sample rate is
-/// preserved (see resample()).
+/// preserved; convert it with resample().
 ///
 /// @param path  Path to the WAV file.
 /// @param out   Receives the decoded audio on success; unspecified on failure.
 /// @param error Receives a human-readable message on failure.
 /// @return `true` on success.
 bool load_wav(const std::string& path, AudioBuffer& out, std::string& error);
-
-/// @brief Resample with linear interpolation.
-///
-/// Adequate for speech front-ends feeding ASR; it applies no anti-aliasing
-/// filter, so it is not suitable for high-fidelity conversion.
-///
-/// @param in          Source audio.
-/// @param target_rate Output sample rate in Hz.
-/// @return A new buffer at @p target_rate (a copy of @p in if the rates match).
-AudioBuffer resample(const AudioBuffer& in, int target_rate);
 
 /// @}
 
