@@ -100,8 +100,8 @@ Exit status: 0 on success, 2 for invalid arguments (before the model loads),
 | Format | `clang-format -i $(git ls-files 'src/*.h' 'src/*.cpp' 'apps/*.cpp' 'tests/*.cpp')` |
 
 Presets build with `-Wall -Wextra -Wpedantic -Wshadow -Werror`. CI runs the
-Release and sanitizer suites, a CUDA compile (no GPU on the runners, so
-compile-only), clang-format, and Doxygen with warnings as errors.
+Release and sanitizer suites, clang-format, and Doxygen with warnings as
+errors on every push; a compile-only CUDA build runs weekly and on demand.
 
 ```
 src/odvi/   audio · segmentation · asr · pipeline · report
