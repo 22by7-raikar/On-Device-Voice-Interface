@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"  # weekly, for the slow CUDA compile
 
 jobs:
   build-test:
@@ -26,7 +29,9 @@ jobs:
 
   # Compile-only: hosted runners have no GPU, but this keeps the CUDA build and
   # the ODVI_USE_GPU code path from silently rotting. sm_86 is the RTX 30 series.
+  # It takes about 15 minutes, so it runs weekly and on demand, not per PR.
   cuda-build:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     container: nvidia/cuda:12.6.3-devel-ubuntu24.04
     steps:
@@ -38,7 +43,15 @@ jobs:
       - name: Configure
         run: cmake --preset cuda -DCMAKE_CUDA_ARCHITECTURES=86 -DODVI_BUILD_TESTS=OFF
       - name: Build
-        run: cmake --build --preset cuda --target odvi_listen -j "$(nproc)"
+        shell: bash
+        run: |
+          set -o pipefail
+          # Surface compiler and linker errors as annotations on the PR.
+          if ! cmake --build --preset cuda --target odvi_listen -j "$(nproc)" 2>&1 | tee build.log; then
+            grep -E 'error|undefined reference|cannot find' build.log | head -20 \
+              | sed 's/^/::error title=CUDA build::/'
+            exit 1
+          fi
 
   format:
     runs-on: ubuntu-24.04
