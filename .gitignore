@@ -24,3 +24,7 @@ __pycache__/
 .vscode/
 .idea/
 *.swp
+
+# Personal Claude Code settings (machine-specific paths and permissions)
+.claude/settings.local.json
+CLAUDE.local.md
