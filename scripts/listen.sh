@@ -5,12 +5,13 @@
 #   scripts/listen.sh --model models/ggml-base.en.bin --mic [alsa-device]
 #
 # Audio is converted to mono 16 kHz S16LE with ffmpeg. Transcript events (JSON
-# Lines) go to stdout; diagnostics go to stderr.
+# Lines) go to stdout; diagnostics go to stderr. Runs build/release by default;
+# set ODVI_LISTEN=build/cuda/apps/odvi_listen to use the CUDA build.
 
 set -euo pipefail
 
 usage() {
-    sed -n '2,8p' "$0" >&2
+    sed -n '2,9p' "$0" >&2
     exit 2
 }
 
