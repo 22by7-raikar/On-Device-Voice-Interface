@@ -26,8 +26,10 @@ struct AsrConfig {
 
 /// @brief Owns one whisper.cpp context and transcribes buffers with greedy decoding.
 ///
-/// When built with `GGML_CUDA=ON` the context is created on GPU 0 and falls
-/// back to the CPU if that fails; backend_mode() reports what is in use.
+/// When built with `GGML_CUDA=ON` the context is created on GPU 0 if that
+/// device exists and initialises, and on the CPU otherwise (also if loading
+/// the model onto the GPU fails). backend_mode() reports the backend actually
+/// in use, and fallback_reason() why the GPU was not used.
 /// Construct once and reuse: loading the model dominates start-up time.
 /// Not thread-safe; one call at a time.
 class AsrEngine {
@@ -44,7 +46,11 @@ public:
     const std::string& load_error() const { return load_error_; }  ///< Why loading failed.
     bool gpu_requested() const { return gpu_requested_; }          ///< Built with GPU support.
     bool gpu_enabled() const { return gpu_enabled_; }              ///< Running on the GPU.
-    bool used_cpu_fallback() const { return cpu_fallback_; }       ///< GPU init failed; on CPU.
+    bool used_cpu_fallback() const { return cpu_fallback_; }       ///< GPU requested; on CPU.
+    /// @brief Why the GPU was not used; empty unless used_cpu_fallback().
+    const std::string& fallback_reason() const { return fallback_reason_; }
+    /// @brief Description of the GPU in use (e.g. its model name); empty on the CPU.
+    const std::string& gpu_device() const { return gpu_device_; }
     /// @brief Active backend: `cpu`, `cuda` or `unavailable`.
     const std::string& backend_mode() const { return backend_mode_; }
 
@@ -63,6 +69,8 @@ private:
     bool gpu_requested_ = false;
     bool gpu_enabled_ = false;
     bool cpu_fallback_ = false;
+    std::string fallback_reason_;
+    std::string gpu_device_;
     std::string backend_mode_ = "cpu";
 };
 

@@ -126,8 +126,12 @@ different classifier.
 
 `Transcriber` is a `std::function<AsrResult(const float*, int)>` taking mono
 16 kHz PCM. `AsrEngine` owns one whisper.cpp context (greedy decoding, no
-timestamps). With `GGML_CUDA=ON` it initialises on GPU 0 and falls back to the
-CPU if that fails; `backend_mode()` reports which backend is active.
+timestamps). With `GGML_CUDA=ON` it uses GPU 0 if that device exists and
+initialises, and the CPU otherwise, or if loading the model onto the GPU fails.
+whisper.cpp itself falls back to the CPU silently when it finds no GPU, so
+`AsrEngine` checks the device before creating the context; `backend_mode()`
+reports the backend actually in use and `fallback_reason()` why the GPU was not
+used. `odvi_listen` prints both to stderr at start-up.
 
 ### Pipeline (`pipeline/`)
 
