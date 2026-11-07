@@ -110,8 +110,11 @@ int run(const Options& o) {
     asr_cfg.language = o.language;
     odvi::AsrEngine asr(asr_cfg);
     if (!asr.ready()) throw std::runtime_error(asr.load_error());
-    std::cerr << "[asr] backend=" << asr.backend_mode()
-              << " cpu_fallback=" << (asr.used_cpu_fallback() ? "yes" : "no") << '\n';
+    std::cerr << "[asr] backend=" << asr.backend_mode();
+    if (!asr.gpu_device().empty()) std::cerr << " device=\"" << asr.gpu_device() << '"';
+    std::cerr << " cpu_fallback=" << (asr.used_cpu_fallback() ? "yes" : "no");
+    if (asr.used_cpu_fallback()) std::cerr << " reason=\"" << asr.fallback_reason() << '"';
+    std::cerr << '\n';
 
     odvi::ListenConfig cfg;
     cfg.input_rate = o.rate;
