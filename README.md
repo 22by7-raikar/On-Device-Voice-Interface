@@ -71,7 +71,9 @@ One event per utterance (illustrative values; latency abridged):
 
 Requirements: CMake ≥ 3.21, a C++17 compiler (CI: GCC 13 on Ubuntu 24.04),
 Python 3 for the protocol test, ffmpeg for `scripts/listen.sh`, and the CUDA
-toolkit for `--preset cuda`.
+toolkit for `--preset cuda` (tested with 12.8 and GCC 9.4). `nvcc` is searched for in
+`$CUDA_PATH/bin`, `$CUDA_HOME/bin`, `PATH` and `/usr/local/cuda/bin`, in that
+order; `-DCMAKE_CUDA_COMPILER=<path>` or `CUDACXX` overrides the search.
 
 ## `odvi_listen`
 
@@ -95,6 +97,7 @@ Exit status: 0 on success, 2 for invalid arguments (before the model loads),
 | Debug build + tests | `cmake --preset debug && cmake --build --preset debug && ctest --preset debug` |
 | AddressSanitizer + UBSan | `cmake --preset asan && cmake --build --preset asan && ctest --preset asan` |
 | CUDA build | `cmake --preset cuda && cmake --build --preset cuda` |
+| Listen with the CUDA build | `ODVI_LISTEN=build/cuda/apps/odvi_listen scripts/listen.sh --model ... --mic` |
 | API docs | `doxygen docs/Doxyfile` → `docs/api/html/index.html` |
 | Diagrams | `docs/diagrams/render.sh` (Mermaid sources → SVG) |
 | Format | `clang-format -i $(git ls-files 'src/*.h' 'src/*.cpp' 'apps/*.cpp' 'tests/*.cpp')` |

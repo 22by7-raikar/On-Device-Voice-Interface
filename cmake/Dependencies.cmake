@@ -11,6 +11,22 @@ if(NOT EXISTS "${WHISPER_ROOT}/CMakeLists.txt")
         "Run `git submodule update --init` or pass -DWHISPER_ROOT=<path>.")
 endif()
 
+# CMake looks for nvcc only on PATH, but NVIDIA's installer puts it in
+# /usr/local/cuda/bin and leaves PATH unchanged, so `cmake --preset cuda` failed
+# with "No CMAKE_CUDA_COMPILER could be found". Search order (find_program):
+# $CUDA_PATH/bin, $CUDA_HOME/bin, PATH, /usr/local/cuda/bin. An explicit
+# -DCMAKE_CUDA_COMPILER or CUDACXX skips the search.
+if(GGML_CUDA AND NOT CMAKE_CUDA_COMPILER AND NOT DEFINED ENV{CUDACXX})
+    find_program(ODVI_NVCC nvcc
+        HINTS ENV CUDA_PATH ENV CUDA_HOME
+        PATHS /usr/local/cuda
+        PATH_SUFFIXES bin
+        DOC "nvcc for GGML_CUDA builds")
+    if(ODVI_NVCC)
+        set(CMAKE_CUDA_COMPILER "${ODVI_NVCC}" CACHE FILEPATH "CUDA compiler")
+    endif()
+endif()
+
 set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(WHISPER_BUILD_SERVER OFF CACHE BOOL "" FORCE)

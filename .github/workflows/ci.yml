@@ -40,8 +40,15 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: true
+      # The container has the toolkit but no driver, so libcuda.so.1 (which
+      # libggml-cuda.so needs) does not exist and linking odvi_listen fails on
+      # the driver API symbols. --allow-shlib-undefined accepts symbols that
+      # shared libraries leave undefined; undefined symbols in our own objects
+      # still fail the link. Not used outside CI: real hosts have the driver.
       - name: Configure
-        run: cmake --preset cuda -DCMAKE_CUDA_ARCHITECTURES=86 -DODVI_BUILD_TESTS=OFF
+        run: >
+          cmake --preset cuda -DCMAKE_CUDA_ARCHITECTURES=86 -DODVI_BUILD_TESTS=OFF
+          -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined
       - name: Build
         shell: bash
         run: |
